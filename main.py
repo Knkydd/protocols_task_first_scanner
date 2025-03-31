@@ -63,33 +63,28 @@ class PortScanner:
 					except OSError:
 						pass
 
+				sock.sendto(b'', (self.ip_address, port))
+
 				try:
-					sock.sendto(b'', (self.ip_address, port))
-
-					start_time = time.time()
-					while time.time() - start_time < self.timeout:
-						try:
-							sock.recvfrom(1024)
-							self.udp_results[port] = True
-							return
-						except ConnectionResetError:
-							self.udp_results[port] = False
-							return
-						except OSError as e:
-							if getattr(e, 'error', None) in (101, 111):
-								self.udp_results[port] = False
-								return
-							raise
-
+					data, _ = sock.recvfrom(1024)
 					self.udp_results[port] = True
-				except socket.timeout:
-					self.udp_results[port] = True
-				except socket.error as e:
-					print(f"Ошибка при сканировании UDP порта {port}: {e}")
+					return
+				except ConnectionResetError:
 					self.udp_results[port] = False
+					return
+				except OSError as e:
+					if getattr(e, 'errno', None) in (101, 111):
+						self.udp_results[port] = False
+						return
+					raise
 
+		except socket.timeout:
+			self.udp_results[port] = True
+		except socket.error as e:
+			print(f"Сетевая ошибка при сканировании UDP порта {port}: {e}")
+			self.udp_results[port] = False
 		except Exception as e:
-			print(f"Неизвестная ошибка при сканировании UDP порта {port}: {e}")
+			print(f"Критическая ошибка при сканировании UDP порта {port}: {e}")
 			self.udp_results[port] = False
 
 	def scan_ports(self, start_port: int, end_port: int, max_workers: int = 100):
